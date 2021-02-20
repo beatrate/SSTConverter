@@ -7,9 +7,19 @@ namespace SSTConverter
 {
 	public enum SentimentLabel
 	{
+		VeryNegative,
 		Negative,
 		Neutral,
-		Positive
+		Positive,
+		VeryPositive
+	}
+
+	public struct SentimentBucket
+	{
+		public SentimentLabel Label;
+		public string DirectoryName;
+		public string CachedPath;
+		public int Counter;
 	}
 
 	class Program
@@ -49,17 +59,24 @@ namespace SSTConverter
 				
 			}
 
-			string negativePath = Path.Combine(outputPath, "negative");
-			string neutralPath = Path.Combine(outputPath, "neutral");
-			string positivePath = Path.Combine(outputPath, "positive");
+			var buckets = new List<SentimentBucket>()
+			{
+				new SentimentBucket { Label = SentimentLabel.VeryNegative, DirectoryName = "very_negative" },
+				new SentimentBucket { Label = SentimentLabel.Negative, DirectoryName = "negative" },
+				new SentimentBucket { Label = SentimentLabel.Neutral, DirectoryName = "neutral" },
+				new SentimentBucket { Label = SentimentLabel.Positive, DirectoryName = "positive" },
+				new SentimentBucket { Label = SentimentLabel.VeryPositive, DirectoryName = "very_positive" }
+			};
 
-			Directory.CreateDirectory(negativePath);
-			Directory.CreateDirectory(neutralPath);
-			Directory.CreateDirectory(positivePath);
+			for(int i = 0; i < buckets.Count; ++i)
+			{
+				SentimentBucket bucket = buckets[i];
 
-			int negativePhraseCounter = 0;
-			int neutralPhraseCounter = 0;
-			int positivePhraseCounter = 0;
+				bucket.CachedPath = Path.Combine(outputPath, bucket.DirectoryName);
+				Directory.CreateDirectory(bucket.CachedPath);
+
+				buckets[i] = bucket;
+			}
 
 			int lineCounter = 0;
 
@@ -95,7 +112,11 @@ namespace SSTConverter
 					// for very negative, negative, neutral, positive, very positive, respectively.
 
 					SentimentLabel label;
-					if(phraseSentiment <= 0.4f)
+					if(phraseSentiment <= 0.2f)
+					{
+						label = SentimentLabel.VeryNegative;
+					}
+					else if(phraseSentiment <= 0.4f)
 					{
 						label = SentimentLabel.Negative;
 					}
@@ -103,32 +124,31 @@ namespace SSTConverter
 					{
 						label = SentimentLabel.Neutral;
 					}
-					else
+					else if(phraseSentiment <= 0.8f)
 					{
 						label = SentimentLabel.Positive;
 					}
-
-					string sentimentPath = null;
-					int fileIndex = 0;
-
-					switch(label)
+					else
 					{
-						case SentimentLabel.Negative:
-							sentimentPath = negativePath;
-							fileIndex = negativePhraseCounter++;
-							break;
-						case SentimentLabel.Neutral:
-							sentimentPath = neutralPath;
-							fileIndex = neutralPhraseCounter++;
-							break;
-						case SentimentLabel.Positive:
-							sentimentPath = positivePath;
-							fileIndex = positivePhraseCounter++;
-							break;
+						label = SentimentLabel.VeryPositive;
 					}
 
-					string phraseText = phrases[phraseId];
-					File.WriteAllText(Path.Combine(sentimentPath, $"{fileIndex}.txt"), phraseText);
+					for(int i = 0; i < buckets.Count; ++i)
+					{
+						SentimentBucket bucket = buckets[i];
+
+						if(bucket.Label == label)
+						{
+							string phraseText = phrases[phraseId];
+							int fileIndex = bucket.Counter;
+							++bucket.Counter;
+							buckets[i] = bucket;
+
+							File.WriteAllText(Path.Combine(bucket.CachedPath, $"{fileIndex}.txt"), phraseText);
+
+							break;
+						}
+					}
 				}
 			}
 		}
